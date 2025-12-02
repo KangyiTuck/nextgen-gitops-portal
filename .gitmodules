@@ -1,4 +1,8 @@
-[submodule "security-policies"]
-	path = security-policies
-	url = https://github.com/raspbernetes/k8s-security-policies
-	branch = master
+# .gitmodules 文件内容
+# 作用：声明本仓库使用了 Git Submodule（子模块）功能
+# 当前只包含一个子模块：security-policies
+
+[submodule "security-policies"]     # 子模块的唯一标识名称（可以随便取，但建议有意义）
+	path = security-policies         # 子模块在本地仓库中的存放路径（即会出现在根目录下的 security-policies 文件夹）
+	url = https://github.com/raspbernetes/k8s-security-policies   # 子模块的远程 Git 仓库地址
+	branch = master                  # 跟踪的分支（master），与主仓库 main 分支保持同步更新

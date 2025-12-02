@@ -1,37 +1,57 @@
 ---
-# creation rules are evaluated sequentially, the first match wins
+# SOPS（Secrets OPerationS）全局配置文件
+# 路径：仓库根目录下的 .sops.yaml
+# 作用：告诉 sops 在加密/解密时：
+#     • 用哪把密钥（PGP / AGE / GCP KMS）
+#     • 哪些字段要加密，哪些字段保持明文
+#     • 匹配哪些文件
+# 注意：creation_rules 按顺序匹配，第一个命中即停止
+
 creation_rules:
-  # secret files using GCP KMS to encrypt the stored PGP keys
+  # ┌─ Rule 1：GCP KMS 加密的特殊文件（目前仓库中已基本废弃）
+  # └─ 只用于 kubernetes/clusters/*/secrets/sops-gpg.encrypted.yaml（或 .yml）
   - path_regex: kubernetes/clusters/.*/secrets/sops-gpg.encrypted.ya?ml
-    encrypted_regex: ^(data|stringData)$
-    unencrypted-regex: ^(description|metadata)$
+    encrypted_regex: ^(data|stringData)$                 # 只加密 data 和 stringData 字段
+    unencrypted-regex: ^(description|metadata)$          # description、metadata 等保持明文
     gcp_kms: projects/raspbernetes/locations/global/keyRings/sops/cryptoKeys/sops-key
-    mac_only_encrypted: true
-  # Helm values files using SOPS
+    mac_only_encrypted: true     # 只计算 MAC，不再追加明文校验（推荐）
+
+  # ┌─ Rule 2：Helm 应用的加密 values 文件
+  # └─ 匹配 kubernetes/apps/**/values.enc.yaml 或 values.enc.yml
   - path_regex: kubernetes/.*/values.enc.ya?ml
-    pgp: 0635B8D34037A9453003FB7B93CAA682FF4C9014
+    pgp: 0635B8D34037A9453003FB7B93CAA682FF4C9014   # 作者本人的主 PGP 公钥指纹
     mac_only_encrypted: true
-  # Kubernetes secret files using SOPS
+
+  # ┌─ Rule 3：普通的 Kubernetes Secret 加密文件（最常用）
+  # └─ 匹配 kubernetes/ 目录下所有 *.enc.yaml（不包括 values.enc.yaml）
   - path_regex: kubernetes/.*/*.enc.ya?ml
     encrypted_regex: ^(data|stringData)$
     unencrypted-regex: ^(description|metadata)$
     pgp: 0635B8D34037A9453003FB7B93CAA682FF4C9014
     mac_only_encrypted: true
-  # Talos secret files using SOPS
+
+  # ┌─ Rule 4：Talos 集群密钥文件（talhelper 生成）
+  # └─ 匹配 talos/**/.enc.yaml
   - path_regex: talos/.*/.*.enc.ya?ml
     pgp: 0635B8D34037A9453003FB7B93CAA682FF4C9014
+    # 加密规则更宽松，几乎所有包含 secret/pass/key/token 等关键字的字段都加密
     encrypted_regex: '((?i)(pass|secret($|[^N])|ca|crt|key|token|^data$|^stringData$))'
     mac_only_encrypted: true
-  # Terraform secret files using SOPS
+
+  # ┌─ Rule 5：Terraform 变量中的秘密（如 cloudflare_api_token 等）
   - path_regex: terraform/.*/*.enc.ya?ml
     pgp: 0635B8D34037A9453003FB7B93CAA682FF4C9014
     mac_only_encrypted: true
-  # AGE encrypted Kubernetes secret files
+
+  # ┌─ Rule 6：使用 Age 密钥加密的 Kubernetes Secret（新方式，逐渐替代 PGP）
+  # └─ 文件后缀为 .enc.age.yaml 或 .enc.age.yml
   - path_regex: kubernetes/.*/*.enc.age.ya?ml
     encrypted_regex: ^(data|stringData)$
     mac_only_encrypted: true
+    # Age 公钥（对应私钥通常放在 ~/.config/sops/age/keys.txt 或 Flux 自动注入）
     age: age19gj66fq5v2veu940ftyj4pkw0w5tgxgddlyqnd00pnjzyndevurqx70g4t
 
+# ┌─ 全局输出格式设置
 stores:
   yaml:
-    indent: 2
+    indent: 2                    # 解密后输出的 YAML 使用 2 个空格缩进（与项目风格保持一致）

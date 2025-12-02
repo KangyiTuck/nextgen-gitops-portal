@@ -1,38 +1,47 @@
-# See https://pre-commit.com for more information
-# See https://pre-commit.com/hooks.html for more hooks
-repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0
-    hooks:
-      - id: trailing-whitespace
-      - id: end-of-file-fixer
-      - id: check-added-large-files
-      - id: check-merge-conflict
-      - id: detect-private-key
-      - id: check-yaml
-        args: [--allow-multiple-documents]
-        exclude: ^kubernetes/apps/base/home-system/recyclarr/app/resources/recyclarr\.yml$
-      - id: check-json
-      - id: check-toml
-      # Only enable this if we want to prevent commits directly to the main branch
-      # - id: no-commit-to-branch
-      #   args: [--branch, main]
+# pre-commit 配置文件
+# 路径：仓库根目录 .pre-commit-config.yaml
+# 作用：在 git commit 前自动运行一系列检查和修复工具，强制代码质量和安全
 
+repos:
+  # ┌─ 官方通用钩子集合（最常用、最稳定）
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0                  # 锁定版本，避免意外破坏性变更
+    hooks:
+      - id: trailing-whitespace                 # 自动删除行尾空格
+      - id: end-of-file-fixer                   # 确保文件以换行符结尾
+      - id: check-added-large-files             # 禁止提交 >500KB 的文件（默认阈值）
+      - id: check-merge-conflict                # 检测残留的 ===== 合并冲突标记
+      - id: detect-private-key                  # 禁止提交私钥文件（极重要！）
+      - id: check-yaml                          # 基础 YAML 语法检查
+        args: [--allow-multiple-documents]     # 允许一个文件包含多个 --- 分隔的文档（K8s 常见）
+        # 排除 recyclarr.yml（该文件由外部工具生成，格式特殊，总是报错）
+        exclude: ^kubernetes/apps/base/home-system/recyclarr/app/resources/recyclarr\.yml$
+      - id: check-json                          # 检查 JSON 语法
+      - id: check-toml                          # 检查 TOML 语法
+
+      # 禁止直接提交到 main 分支（保护主干）
+      # - id: no-commit-to-branch
+      #   args: [--branch, main]     # 当前已注释，不启用
+
+  # ┌─ yamllint：深度 YAML 格式与风格检查
   - repo: https://github.com/adrienverge/yamllint.git
     rev: v1.37.1
     hooks:
       - id: yamllint
+        # 使用根目录的 .yamllint.yaml 自定义规则（前面已详细解释）
         args: [-c=.yamllint.yaml]
 
-  # TODO: Enable this once we have a markdownlint config
+  # ┌─ Markdown 格式检查（目前未启用）
+  # TODO: 等制定好 markdownlint 规则后再打开
   # - repo: https://github.com/igorshubovych/markdownlint-cli
   #   rev: v0.44.0
   #   hooks:
   #     - id: markdownlint
-  #       args: [--fix]
+  #       args: [--fix]          # 自动修复能修的问题
 
+  # ┌─ Shell 脚本静态检查（目前仓库几乎没写 shell 脚本，所以先注释）
   # - repo: https://github.com/koalaman/shellcheck-precommit
   #   rev: v0.11.0
   #   hooks:
   #     - id: shellcheck
-  #       args: [--severity=warning]
+  #       args: [--severity=warning]   # 只显示 warning 及以上级别问题

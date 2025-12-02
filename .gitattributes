@@ -1,2 +1,26 @@
+# .gitattributes 文件
+# 作用：告诉 Git 如何特殊处理某些路径或后缀的文件
+# 主要用于“加密敏感文件”与“安全显示 diff”两大场景
+
+# 第 1 行：git-crypt 相关（历史遗留，已基本废弃）
 .secrets/git-crypt/** filter=git-crypt diff=git-crypt
+# 解释：
+#   - .secrets/git-crypt/ 目录（如果存在）下的所有文件
+#   - 在 git add 时自动用 git-crypt 加密
+#   - 在 git diff 时显示为加密后的二进制（而不是明文）
+# 当前状态：作者已经全面迁移到 sops + age，仓库中已无此目录，属于历史残留，可安全删除此行
+
+# 第 2 行：sops 加密文件安全 diff（现行核心配置，必须保留！）
 *.enc.yaml diff=sopsdiffer
+# 解释：
+#   - 所有以 .enc.yaml 结尾的文件（sops 加密的 Kubernetes Secret）
+#   - 当执行 git diff、git log -p、GitHub PR diff 时
+#   - 不会直接显示加密后的乱码，而是自动调用 sopsdiffer 工具
+#   - sopsdiffer 会用本地 sops 密钥解密后，再进行漂亮的 diff 对比
+#   - 你在终端或 GitHub 上看到的永远是“明文 diff”，例如：
+#     - password: ENC[...]
+#     + password: ENC[new-value]
+#     实际显示为：
+#     - password: old-clear-text
+#     + password: new-clear-text
+

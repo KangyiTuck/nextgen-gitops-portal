@@ -1,23 +1,32 @@
 ---
 # yaml-language-server: $schema=https://taskfile.dev/schema.json
-version: '3.41.0'
+# Taskfile 版本号，指定使用的 Task 工具语法版本
+version: '3.41.2'
 
+# 全局变量定义，整个项目中都可以通过 {{.VAR_NAME}} 的方式引用
 vars:
-  CLUSTER: cluster-00
-  GITHUB_USER: xunholy
-  GITHUB_REPO: k8s-gitops
-  GITHUB_BRANCH: main
+  CLUSTER: cluster-00           # 默认集群名称，用于标识目标集群（如 cluster-00、cluster-01）
+  GITHUB_USER: xunholy          # GitHub 用户名/组织名，指向 xUnholy（原作者）
+  GITHUB_REPO: k8s-gitops       # GitOps 配置仓库名称
+  GITHUB_BRANCH: main           # 默认同步的分支，通常为 main
 
+# 引入子 Taskfile，采用模块化方式组织任务
+# 每个关键字对应一个子目录下的 Taskfile.yml，方便维护和复用
 includes:
-  fluxcd: .taskfiles/bootstrap
-  core: .taskfiles/core
-  flux: .taskfiles/flux
-  docs: .taskfiles/mkdocs
-  talos: .taskfiles/talos
+  fluxcd: .taskfiles/bootstrap   # FluxCD 引导相关任务（早期版本目录名，保留兼容）
+  core:   .taskfiles/core        # 核心通用任务（如集群信息查询、kubectl 封装等）
+  flux:   .taskfiles/flux        # FluxCD 核心操作任务（创建 secret、bootstrap、检查等）
+  docs:   .taskfiles/mkdocs      # MkDocs 文档站点构建、预览、部署任务
+  talos:  .taskfiles/talos       # Talos Linux 系统相关的任务（生成机器配置、升级等）
 
+# 定义根级任务（在项目根目录直接运行 task xxx 即可调用）
 tasks:
+  # 任务名称：flux
+  # 功能描述：将 FluxCD v2 完整安装到指定的 Kubernetes 集群中
   flux:
-    desc: "Install Fluxv2 into a cluster"
+    desc: "Install Fluxv2 into a cluster"   # 任务说明，运行 task -l 时会显示
     cmds:
-      - task: flux:secrets
-      - task: flux:bootstrap
+      # 按顺序执行两个子任务（都在 .taskfiles/flux/Taskfile.yml 中定义）
+      - task: flux:secrets    # 第1步：创建 GitHub Token、Age 密钥等必要的 Secret
+      - task: flux:bootstrap  # 第2步：执行 flux bootstrap，把 Git 仓库同步到集群
+      # 执行完这两步后，FluxCD 会自动接管集群，实现完整的 GitOps 流程

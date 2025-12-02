@@ -1,16 +1,41 @@
-## Used by Fluxv2 Source Controller https://toolkit.fluxcd.io/components/source/gitrepositories/#excluding-files
+## Used by Fluxv2 Source Controller 
+## https://toolkit.fluxcd.io/components/source/gitrepositories/#excluding-files
+# Flux 的 Source Controller 在拉取 GitRepository 时支持 .gitignore 风格的排除规则
+# 通过这个文件可以大幅降低 Flux 同步时的文件数量、提升性能、避免泄露敏感信息
 
-# Exclude all by default
+# 第一步：默认排除仓库中所有文件和目录（相当于全量忽略）
 /*
+# 解释：/* 表示仓库根目录下的一切（包括所有子目录和文件）都被忽略
+# 这样可以做到“白名单模式”，只同步真正需要的文件
 
-# Include the following explicit folder(s)
+# 第二步：显式包含 kubernetes 目录（这是 GitOps 配置的核心）
 !/kubernetes
+# 解释：! 是否定前缀，意思是“强制包含”
+# 现在 kubernetes/ 目录下的内容又被重新放行
 
-# Exclude sub-foler(s) and file(s)
+# 第三步：在 kubernetes/clusters/ 下排除不需要同步的目录
 /kubernetes/clusters/**/infrastructure/
 /kubernetes/clusters/**/secrets/
+# 解释：
+#   infrastructure/   → 通常放 Terraform、Talos 生成的机器配置等，体积大且频繁变动，不适合 Flux 频繁 reconcile
+#   secrets/           → 除了下面显式包含的几个文件外，其他都是 sops 加密的秘密或临时文件，不需要也不应该让 Flux 读取
 
-# Include sub-foler(s) and file(s)
+# 第四步：对 secrets/ 目录做精细白名单，只同步真正需要 Flux 解密的几个核心文件
 !/kubernetes/clusters/**/secrets/cluster-config.yaml
 !/kubernetes/clusters/**/secrets/cluster-secrets.enc.yaml
 !/kubernetes/clusters/**/secrets/sealed-secret-private-key.enc.yaml
+# 详细说明：
+#   cluster-config.yaml                     → 明文配置（通常包含集群名称、域名等非敏感信息），Flux 需要读取
+#   cluster-secrets.enc.yaml                → 用 sops + age/cosign 加密的集群级秘密，Flux + sops 插件会自动解密并创建 Secret
+#   sealed-secret-private-key.enc.yaml      → Sealed Secrets 主私钥（加密后），供 kubesealedsecrets 控制器解密使用
+# 其他 *.enc.yaml 文件（如各个应用的密钥）虽然也在仓库里，但因为被上面第3步的规则排除了，所以不会被 Flux 拉取和处理（避免不必要的解密负担和潜在泄露风险）
+
+# 最终效果总结（以 cluster-00 为例）：
+# Flux 只会同步以下路径：
+#   kubernetes/apps/**
+#   kubernetes/namespaces/**
+#   kubernetes/base/**
+#   kubernetes/clusters/cluster-00/secrets/cluster-config.yaml
+#   kubernetes/clusters/cluster-00/secrets/cluster-secrets.enc.yaml
+#   kubernetes/clusters/cluster-00/secrets/sealed-secret-private-key.enc.yaml
+# 其他所有文件（包括 talos/、terraform/、大量 infrastructure 配置、其他加密秘密）都不会被 Flux 下载和监控
